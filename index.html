@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Танковые контейнеры</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#10141c;color:#fff;font-family:sans-serif;padding:0 0 80px}
+.top{position:sticky;top:0;z-index:5;background:#161c28;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid #263047}
+.gold{font-size:20px;color:#ffd24d;font-weight:bold}
+button{border:0;border-radius:10px;padding:11px 16px;font-size:15px;color:#fff;background:#3d7bff}
+button:disabled{opacity:.4}
+button.g{background:#2e9e5b}button.r{background:#c23b3b}button.d{background:#2a3347}
+.wrap{padding:12px}
+.nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#161c28;border-top:1px solid #263047;z-index:5}
+.nav button{flex:1;border-radius:0;background:none;padding:16px 4px;font-size:14px;color:#8a93a6}
+.nav button.on{color:#fff;background:#222b3d}
+.sub{display:flex;gap:8px;margin-bottom:12px}
+.sub button{flex:1;background:#222b3d;color:#8a93a6}
+.sub button.on{background:#3d7bff;color:#fff}
+.box{background:#1b2230;border-radius:14px;padding:14px;margin-bottom:12px;text-align:center}
+.big{font-size:54px}
+small,.mut{color:#8a93a6}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}
+.it{background:#1b2230;border-radius:10px;border-bottom:4px solid;padding:8px;font-size:13px;text-align:center}
+.it button{padding:6px 10px;font-size:13px;margin-top:6px}
+.bar{height:8px;background:#2a3347;border-radius:6px;overflow:hidden;margin:8px 0}
+.bar i{display:block;height:100%;background:#ffd24d}
+#ov{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:10;display:none;align-items:center;justify-content:center;padding:12px}
+#mc{background:#161c28;border-radius:16px;padding:14px;width:100%;max-width:480px;max-height:90vh;overflow:auto;text-align:center}
+.pack{display:flex;justify-content:space-between;align-items:center;background:#1b2230;border-radius:10px;padding:10px 12px;margin:8px 0;text-align:left}
+.pack b{font-size:17px}
+#roll{position:relative;overflow:hidden;height:130px;background:#181e2a;border-radius:12px;margin:10px 0}
+#roll::after{content:"";position:absolute;left:50%;top:0;bottom:0;width:3px;background:#ffd24d;z-index:2}
+#strip{display:flex;height:100%;align-items:center}
+.card{flex:0 0 96px;height:104px;margin:0 3px;border-radius:10px;background:#222a3a;border-bottom:5px solid;display:flex;flex-direction:column;justify-content:center;font-size:11px;padding:3px}
+.card b{font-size:24px;display:block}
+.row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #263047;font-size:14px;text-align:left}
+.sec{border-top:1px solid #263047;margin-top:12px;padding-top:12px}
+input.pi{width:100%;padding:14px;font-size:17px;border-radius:10px;border:1px solid #2a3347;background:#10141c;color:#fff;text-align:center;margin:12px 0;outline:none}
+input.pi:focus{border-color:#3d7bff}
+#toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#2e9e5b;padding:10px 16px;border-radius:10px;z-index:20;display:none}
+</style>
+</head>
+<body>
+<div class="top">
+  <div class="gold">🪙 <span id="gold"></span></div>
+  <button class="g" id="bonus">Бонус +1500</button>
+</div>
+<div class="wrap" id="main"></div>
+<div class="nav">
+  <button id="n-shop" onclick="go('shop')">🛒 Магазин</button>
+  <button id="n-inv" onclick="go('inv')">🎒 Инвентарь</button>
+  <button id="n-promo" onclick="go('promo')">🎟️ Промокоды</button>
+</div>
+<div id="ov"><div id="mc"></div></div>
+<div id="toast"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const ROM=['','','','','','V','VI','VII','VIII','IX','X'];
+const CLS={ТТ:'Тяжёлый',СТ:'Средний',ПТ:'ПТ-САУ'};
+const PRICE={10:7500,9:5000,8:3750,7:2500,6:1750,5:1250};
+const TCOL={10:'#ffb020',9:'#b05cff',8:'#3d9bff',7:'#4cc36a',5:'#9aa4b5'};
+
+// ================= ТАНКИ =================
+// [название, флаг, класс, уровень]
+const TANKS=[
+['Carro 45t','🇮🇹','СТ',10],['Lion','🇮🇹','СТ',10],['Strv K','🇸🇪','ТТ',10],
+['Škoda T 27','🇨🇿','СТ',9],['Tornvagn','🇸🇪','ТТ',9],
+['Škoda T 56','🇨🇿','ТТ',8],['Progetto 46','🇮🇹','СТ',8],['ShPTK-TVP 100','🇨🇿','ПТ',8],
+['Bisonte C45','🇮🇹','ТТ',8],['SMV Vipera','🇮🇹','ПТ',8],['SDP wz. 66 Grom','🇵🇱','ПТ',8],
+['Strv 81','🇸🇪','СТ',8],['EMIL 1951','🇸🇪','ТТ',8],['Lansen C','🇸🇪','СТ',8],
+['Škoda T 45','🇨🇿','ТТ',7],['CS-52 LIS','🇵🇱','СТ',7],['Свей','🇸🇪','СТ',7],
+['121B','🇨🇳','СТ',10],['WZ-111 5A','🇨🇳','ТТ',10],['114 SP2','🇨🇳','ТТ',10],['116-F3','🇨🇳','ТТ',10],
+['AMX 30 B','🇫🇷','СТ',10],['AMX M4 mle. 54','🇫🇷','ТТ',10],
+['Kpz 50 t','🇩🇪','СТ',10],['VK 90.01 (P)','🇩🇪','ТТ',10],
+['Chieftain Mk. 6','🇬🇧','ТТ',10],['Super Conqueror','🇬🇧','ТТ',10],['FV217 Badger','🇬🇧','ПТ',10],
+['Concept 1B','🇺🇸','ТТ',10],['XM66F','🇺🇸','ПТ',10],['T95E6','🇺🇸','ТТ',10],['M60','🇺🇸','СТ',10],
+['Об. 907','🇷🇺','СТ',10],['Об. 260','🇷🇺','ТТ',10],['Об. 777 II','🇷🇺','ТТ',10],
+['Т-22 ср.','🇷🇺','СТ',10],['Объект 268/4','🇷🇺','ПТ',10],
+['Ambassador','🇸🇪','СТ',9],
+// Хэллоуин (5-й элемент 1 = редкий танк, при продаже будет предупреждение)
+['Жнец','🏴‍☠️','ПТ',8,1],['Кусака','🏴‍☠️','СТ',8,1],
+['Хелсинг','🏴‍☠️','ПТ',7,1],['Франкенштанк','🇩🇪','ТТ',7,1],['Дракула','🏴‍☠️','СТ',7,1],
+['Ликан','🏴‍☠️','ТТ',7,1],['Фараон','🏴‍☠️','ТТ',7,1],['Лесная ведьма','🏴‍☠️','ТТ',7,1],
+['Светоносец','🏴‍☠️','ТТ',7,1],['Кошмар','🏴‍☠️','ПТ',5,1],['Меджай','🏴‍☠️','ТТ',5,1]
+];
+const TI=n=>TANKS.findIndex(t=>t[0]===n);
+
+// ================= РЕСУРСЫ НА СКЛАДЕ =================
+const RESN={
+ silver:['🥈','Серебро'],fxp:['📜','Свободный опыт'],x3:['✨','Сертификаты ×3 опыта'],
+ b_crew:['🎖️','Бустер опыта экипажа'],b_cred:['💰','Бустер кредитов (серебра)'],
+ b_fxp:['🧪','Бустер свободного опыта'],b_btl:['⚔️','Бустер боевого опыта'],
+ b_rel:['🔧','Бустер перезарядки снаряжения']
+};
+
+// ================= ПРОМОКОДЫ =================
+// Ключ пишется ЗАГЛАВНЫМИ буквами (регистр ввода не важен).
+// gold: золото | cont: {eu:3} контейнеры | res: {silver:200000} ресурсы | tanks:['Lion'] танки
+const PROMOS={
+ 'TEST':{gold:100000},
+ 'HAPPYHALLOWEEN2026':{cont:{hw:20}}
+};
+function promoText(p){
+  const a=[];
+  if(p.gold)a.push('🪙 '+fmt(p.gold)+' золота');
+  if(p.cont)for(const id in p.cont)a.push('📦 '+CB(id).name+' ×'+p.cont[id]);
+  if(p.res)for(const k in p.res)a.push(RESN[k][0]+' '+RESN[k][1]+' +'+fmt(p.res[k]));
+  if(p.tanks)p.tanks.forEach(n=>{const t=TANKS[TI(n)];a.push(t[1]+' '+t[0])});
+  return a;
+}
+
+// ================= КОНТЕЙНЕРЫ =================
+// res: key (склад), q (сколько), ic, n, w (вес), g (группа: из неё выпадает один вариант)
+// direct: 30 талисманов сразу дают этот танк
+const CONTS=[
+{
+ id:'eu',name:'Европейский контейнер',ic:'🇪🇺📦',tal:'Талисман Европы',cert:'Сертификат Европы',
+ packs:[[1,1500],[3,4250],[5,7000],[10,13500],[15,19500]],
+ tankW:0.15,
+ tanks:['Carro 45t','Lion','Strv K','Škoda T 27','Tornvagn','Škoda T 56','Progetto 46','ShPTK-TVP 100','Bisonte C45','SMV Vipera','SDP wz. 66 Grom','Strv 81','EMIL 1951','Lansen C','Škoda T 45','CS-52 LIS','Свей'],
+ count:[[2,50],[3,35],[4,15]],
+ res:[
+  {key:'silver',q:200000,ic:'🥈',n:'Серебро 200 000',w:85},
+  {key:'fxp',q:28000,ic:'📜',n:'Серт. 28 000 св. опыта',w:1.5},
+  {key:'b_crew',q:12,ic:'🎖️',n:'Бустер опыта экипажа ×12',w:8,s:'Бустер'},
+  {key:'b_cred',q:3,ic:'💰',n:'Бустер кредитов ×3',w:8,s:'Бустер'},
+  {key:'b_fxp',q:11,ic:'🧪',n:'Бустер свободного опыта ×11',w:8,s:'Бустер'},
+  {key:'b_btl',q:5,ic:'⚔️',n:'Бустер боевого опыта ×5',w:8,s:'Бустер'}
+ ]
+},
+{
+ id:'pr',name:'Высшие Хищники',ic:'🦈📦',tal:'Талисман «Высшие Хищники»',cert:'Сертификат «Высшие Хищники»',
+ packs:[[1,2300],[3,6750],[5,10950],[10,21150]],
+ tankW:0.22,
+ tanks:['121B','WZ-111 5A','114 SP2','116-F3','Carro 45t','Lion','Strv K','AMX 30 B','AMX M4 mle. 54','Kpz 50 t','VK 90.01 (P)','Chieftain Mk. 6','Super Conqueror','FV217 Badger','Concept 1B','XM66F','T95E6','M60','Об. 907','Об. 260','Об. 777 II','Т-22 ср.','Объект 268/4'],
+ count:[[2,50],[3,35],[4,15]],
+ res:[
+  {key:'silver',q:220000,ic:'🥈',n:'Серебро 220 000',w:90},
+  {key:'fxp',q:28000,ic:'📜',n:'Серт. 28 000 св. опыта',w:0.09},
+  {key:'b_btl',q:5,ic:'⚔️',n:'Бустер боевого опыта ×5',w:1.12,s:'Бустер'},
+  {key:'b_fxp',q:11,ic:'🧪',n:'Бустер свободного опыта ×11',w:1.12,s:'Бустер'},
+  {key:'b_crew',q:12,ic:'🎖️',n:'Бустер опыта экипажа ×12',w:1.12,s:'Бустер'},
+  {key:'b_cred',q:3,ic:'💰',n:'Бустер серебра ×3',w:1.12,s:'Бустер'},
+  {key:'x3',q:3,ic:'✨',n:'Серт. ×3 опыта ×3',w:89.02,g:'x3'},
+  {key:'x3',q:5,ic:'✨',n:'Серт. ×3 опыта ×5',w:0.89,g:'x3'},
+  {key:'x3',q:10,ic:'✨',n:'Серт. ×3 опыта ×10',w:0.09,g:'x3'},
+  {key:'fxp',q:4600,ic:'📜',n:'Серт. 2 300 св. опыта ×2',w:0.89},
+  {key:'fxp',q:1600,ic:'📜',n:'Серт. 200 св. опыта ×8',w:89.02}
+ ]
+},
+{
+ id:'amb',name:'Ambassador',ic:'🇸🇪🎁',tal:'Талисман Ambassador',cert:'',direct:'Ambassador',
+ packs:[[1,2000],[3,5740],[5,9500]],
+ tankW:2,
+ tanks:['Ambassador'],
+ count:[[3,1]],
+ res:[
+  {key:'silver',q:250000,ic:'🥈',n:'Серебро 250 000',w:65.33,g:'sil'},
+  {key:'silver',q:325000,ic:'🥈',n:'Серебро 325 000',w:22.87,g:'sil'},
+  {key:'silver',q:500000,ic:'🥈',n:'Серебро 500 000',w:9.80,g:'sil'},
+  {key:'b_fxp',q:7,ic:'🧪',n:'Бустер свободного опыта ×7',w:12.25,g:'bf',s:'Бустер'},
+  {key:'b_fxp',q:10,ic:'🧪',n:'Бустер свободного опыта ×10',w:4.29,g:'bf',s:'Бустер'},
+  {key:'b_fxp',q:15,ic:'🧪',n:'Бустер свободного опыта ×15',w:1.84,g:'bf',s:'Бустер'},
+  {key:'b_fxp',q:20,ic:'🧪',n:'Бустер свободного опыта ×20',w:0.86,g:'bf',s:'Бустер'},
+  {key:'b_rel',q:10,ic:'🔧',n:'Бустер перезарядки ×10',w:12.25,g:'br',s:'Бустер'},
+  {key:'b_rel',q:12,ic:'🔧',n:'Бустер перезарядки ×12',w:4.29,g:'br',s:'Бустер'},
+  {key:'b_rel',q:15,ic:'🔧',n:'Бустер перезарядки ×15',w:1.84,g:'br',s:'Бустер'},
+  {key:'b_cred',q:3,ic:'💰',n:'Бустер серебра ×3',w:12.25,g:'bc',s:'Бустер'},
+  {key:'b_cred',q:5,ic:'💰',n:'Бустер серебра ×5',w:4.29,g:'bc',s:'Бустер'},
+  {key:'b_crew',q:7,ic:'🎖️',n:'Бустер опыта экипажа ×7',w:12.25,s:'Бустер'},
+  {key:'b_btl',q:4,ic:'⚔️',n:'Бустер боевого опыта ×4',w:12.25,s:'Бустер'},
+  {key:'fxp',q:2000,ic:'📜',n:'Серт. 200 св. опыта ×10',w:65.33,g:'c2'},
+  {key:'fxp',q:3000,ic:'📜',n:'Серт. 200 св. опыта ×15',w:22.87,g:'c2'},
+  {key:'fxp',q:5000,ic:'📜',n:'Серт. 200 св. опыта ×25',w:9.80,g:'c2'}
+ ]
+},
+{
+ id:'hw',name:'Сладость или Гадость',ic:'🎃📦',tal:'',cert:'',hidden:true,noTal:true,
+ packs:[],
+ tankW:0.64,
+ tanks:['Жнец','Кусака','Хелсинг','Франкенштанк','Дракула','Ликан','Фараон','Лесная ведьма','Светоносец','Кошмар','Меджай'],
+ count:[[3,50],[4,50]],
+ res:[
+  {key:'gold',q:500,ic:'🪙',n:'Золото 500',w:8.65,g:'gold',s:'Золото'},
+  {key:'gold',q:750,ic:'🪙',n:'Золото 750',w:5.76,g:'gold',s:'Золото'},
+  {key:'gold',q:1000,ic:'🪙',n:'Золото 1 000',w:2.88,g:'gold',s:'Золото'},
+  {key:'gold',q:1500,ic:'🪙',n:'Золото 1 500',w:1.44,g:'gold',s:'Золото'},
+  {key:'gold',q:2500,ic:'🪙',n:'Золото 2 500',w:0.69,g:'gold',s:'Золото'},
+  {key:'gold',q:5000,ic:'🪙',n:'Золото 5 000',w:0.35,g:'gold',s:'Золото'},
+  {key:'gold',q:7500,ic:'🪙',n:'Золото 7 500',w:0.17,g:'gold',s:'Золото'},
+  {key:'gold',q:10000,ic:'🪙',n:'Золото 10 000',w:0.06,g:'gold',s:'Золото'},
+  {key:'silver',q:150000,ic:'🥈',n:'Серебро 150 000',w:66.67,g:'sil'},
+  {key:'silver',q:250000,ic:'🥈',n:'Серебро 250 000',w:23.33,g:'sil'},
+  {key:'silver',q:375000,ic:'🥈',n:'Серебро 375 000',w:10,g:'sil'},
+  {key:'b_btl',q:5,ic:'⚔️',n:'Бустер боевого опыта ×5',w:13.33,g:'bb',s:'Бустер'},
+  {key:'b_btl',q:7,ic:'⚔️',n:'Бустер боевого опыта ×7',w:4.67,g:'bb',s:'Бустер'},
+  {key:'b_btl',q:10,ic:'⚔️',n:'Бустер боевого опыта ×10',w:2,g:'bb',s:'Бустер'},
+  {key:'b_crew',q:10,ic:'🎖️',n:'Бустер опыта экипажа ×10',w:13.33,g:'bw',s:'Бустер'},
+  {key:'b_crew',q:15,ic:'🎖️',n:'Бустер опыта экипажа ×15',w:4.67,g:'bw',s:'Бустер'},
+  {key:'b_crew',q:20,ic:'🎖️',n:'Бустер опыта экипажа ×20',w:2,g:'bw',s:'Бустер'},
+  {key:'b_fxp',q:10,ic:'🧪',n:'Бустер свободного опыта ×10',w:13.33,g:'bf',s:'Бустер'},
+  {key:'b_fxp',q:15,ic:'🧪',n:'Бустер свободного опыта ×15',w:4.67,g:'bf',s:'Бустер'},
+  {key:'b_fxp',q:20,ic:'🧪',n:'Бустер свободного опыта ×20',w:2,g:'bf',s:'Бустер'},
+  {key:'b_cred',q:2,ic:'💰',n:'Бустер кредитов ×2',w:13.33,g:'bc',s:'Бустер'},
+  {key:'b_cred',q:3,ic:'💰',n:'Бустер кредитов ×3',w:4.67,g:'bc',s:'Бустер'},
+  {key:'b_cred',q:5,ic:'💰',n:'Бустер кредитов ×5',w:2,g:'bc',s:'Бустер'},
+  {key:'fxp',q:1400,ic:'📜',n:'Серт. 200 св. опыта ×7',w:66.67,g:'c2'},
+  {key:'fxp',q:2000,ic:'📜',n:'Серт. 200 св. опыта ×10',w:23.33,g:'c2'},
+  {key:'fxp',q:3000,ic:'📜',n:'Серт. 200 св. опыта ×15',w:10,g:'c2'}
+ ]
+}
+];
+const NEED=30,BONUS_CD=60000;
+
+CONTS.forEach(c=>{
+  c.drops=[];
+  c.tanks.forEach(n=>c.drops.push({t:'tank',i:TI(n),w:c.tankW}));
+  c.res.forEach(r=>c.drops.push({t:'res',key:r.key,q:r.q,ic:r.ic,n:r.n,s:r.s||'Ресурс',w:r.w,g:r.g}));
+  c.drops.forEach((d,i)=>{d.id=i;if(d.g===undefined)d.g='d'+i});
+});
+const CB=id=>CONTS.find(c=>c.id===id);
+
+// ================= СОХРАНЕНИЕ =================
+function load(){
+  let s=JSON.parse(localStorage.getItem('wb4')||'null');
+  if(s){s.promos=s.promos||{};return s}
+  s={gold:20000,cont:{},tal:{},cert:{},tanks:{},res:{},bonus:0,promos:{}};
+  const o=JSON.parse(localStorage.getItem('wb3')||'null');
+  if(o){
+    s.gold=o.gold;s.cont.eu=o.cont;s.tal.eu=o.tal;s.cert.eu=o.cert;s.tanks=o.tanks;s.bonus=o.bonus;
+    s.res={silver:o.silver,fxp:o.fxp,b_crew:o.boost.crew,b_cred:o.boost.cred,b_fxp:o.boost.fxp,b_btl:o.boost.btl};
+  }
+  return s;
+}
+let S=load();
+const save=()=>localStorage.setItem('wb4',JSON.stringify(S));
+let page='shop',sub='cont',busy=false;
+const fmt=n=>n.toLocaleString('ru-RU');
+const gv=(o,k)=>o[k]||0;
+
+function go(p){page=p;render()}
+function toast(t,bad){const e=$('toast');e.textContent=t;e.style.background=bad?'#c23b3b':'#2e9e5b';e.style.display='block';setTimeout(()=>e.style.display='none',1800)}
+function modal(h){$('mc').innerHTML=h;$('ov').style.display='flex'}
+function closeM(){if(busy)return;$('ov').style.display='none'}
+
+// ================= ВЫПАДЕНИЕ =================
+function rewardCount(c){
+  const tot=c.count.reduce((a,r)=>a+r[1],0);
+  let r=Math.random()*tot;
+  for(const [n,w] of c.count){r-=w;if(r<0)return n}
+  return c.count[0][0];
+}
+function pickMany(c,n){
+  let pool=c.drops.slice();const res=[];
+  for(let k=0;k<n&&pool.length;k++){
+    const tot=pool.reduce((a,d)=>a+d.w,0);
+    let r=Math.random()*tot,idx=pool.length-1;
+    for(let j=0;j<pool.length;j++){r-=pool[j].w;if(r<0){idx=j;break}}
+    const d=pool[idx];res.push(d);
+    pool=pool.filter(x=>x.g!==d.g);
+  }
+  return res;
+}
+function info(d){
+  if(d.t==='tank'){const t=TANKS[d.i];return{ic:t[1],n:t[0],s:ROM[t[3]]+' · '+t[2],c:TCOL[t[3]]}}
+  return{ic:d.ic,n:d.n,s:d.s,c:d.s==='Бустер'?'#2cc7c7':(d.key==='silver'?'#9aa4b5':(d.key==='gold'?'#ffd24d':'#ff6fb0'))};
+}
+function apply(d){
+  if(d.t==='tank'){const n=TANKS[d.i][0];S.tanks[n]=gv(S.tanks,n)+1}
+  else if(d.key==='gold')S.gold+=d.q;
+  else S.res[d.key]=gv(S.res,d.key)+d.q;
+}
+function cardH(d){const i=info(d);return '<div class="card" style="border-color:'+i.c+'"><b>'+i.ic+'</b>'+i.n+'<small>'+i.s+'</small></div>'}
+function rowH(d){const i=info(d);return '<div class="row"><span>'+i.ic+' <b style="color:'+i.c+'">'+i.n+'</b><br><small>'+i.s+'</small></span></div>'}
+
+const CH={};
+function chances(c){
+  if(CH[c.id])return CH[c.id];
+  const cnt={},N=20000;
+  for(let i=0;i<N;i++)pickMany(c,rewardCount(c)).forEach(d=>{cnt[d.id]=(cnt[d.id]||0)+1});
+  const r={};for(const k in cnt)r[k]=cnt[k]/N*100;
+  CH[c.id]=r;return r;
+}
+function cntText(c){
+  const a=c.count.map(x=>x[0]),mn=Math.min(...a),mx=Math.max(...a);
+  return mn===mx?'ровно '+mn+' награды':'от '+mn+' до '+mx+' разных наград';
+}
+
+// ================= МАГАЗИН =================
+function shopPage(){
+  return CONTS.filter(c=>!c.hidden).map(c=>'<div class="box"><div class="big">'+c.ic+'</div><h3 style="margin:6px 0">'+c.name+'</h3>'+
+  '<small>Гарантированно: '+c.tal+' ×1<br>+ '+cntText(c)+'<br>'+(c.direct?'30 талисманов = танк '+c.direct:'Танков в списке: '+c.tanks.length)+'</small><br><br>'+
+  '<button onclick="shopModal(\''+c.id+'\')">Выбрать · от '+fmt(c.packs[0][1])+' 🪙</button>'+
+  '<br><br><button class="d" onclick="dropsModal(\''+c.id+'\')">Содержимое и шансы</button></div>').join('');
+}
+function shopModal(id){
+  const c=CB(id),base=c.packs[0][1];
+  let h='<h3 style="margin-top:0">'+c.name+'</h3>';
+  c.packs.forEach(pk=>{
+    const n=pk[0],p=pk[1];
+    const sv=Math.round((1-p/(base*n))*100);
+    h+='<div class="pack"><div><b>'+n+' шт.</b><br><small>'+(sv>0?'Выгода '+sv+'%':'Без скидки')+'</small></div>'+
+    '<button onclick="buy(\''+id+'\','+n+','+p+')">'+fmt(p)+' 🪙</button></div>';
+  });
+  h+='<button class="d" onclick="closeM()">Закрыть</button>';
+  modal(h);
+}
+function buy(id,n,p){
+  if(S.gold<p){toast('Недостаточно золота',1);return}
+  S.gold-=p;S.cont[id]=gv(S.cont,id)+n;save();closeM();render();toast('Куплено: '+n+' шт.');
+}
+function dropsModal(id){
+  const c=CB(id),ch=chances(c);
+  const pc=d=>(ch[d.id]||0).toFixed(2)+'%';
+  let h='<h3 style="margin-top:0">'+c.name+'</h3>'+
+  '<small>В каждом контейнере: '+cntText(c)+' (без повторов). Шанс: что награда выпадет в контейнере.</small>'+
+  (c.noTal?'':'<div class="row"><span>🗿 '+c.tal+'</span><b>100%</b></div>');
+  c.drops.filter(d=>d.t==='tank').forEach(d=>{const t=TANKS[d.i];
+    h+='<div class="row"><span>'+t[1]+' '+t[0]+'<br><small>'+ROM[t[3]]+' · '+t[2]+'</small></span><b>'+pc(d)+'</b></div>'});
+  c.drops.filter(d=>d.t!=='tank').forEach(d=>{
+    h+='<div class="row"><span>'+d.ic+' '+d.n+'</span><b>'+pc(d)+'</b></div>'});
+  h+=(c.noTal?'':'<div class="sec"><small>'+(c.direct?NEED+' талисманов → танк '+c.direct:NEED+' талисманов → '+c.cert+': 1 танк из списка, шанс каждого '+(100/c.tanks.length).toFixed(2)+'%')+'</small></div>')+
+  '<br><button class="d" onclick="closeM()">Закрыть</button>';
+  modal(h);
+}
+
+// ================= ПРОМОКОДЫ (страница) =================
+function promoPage(){
+  const used=Object.keys(S.promos);
+  let h='<div class="box"><div class="big">🎟️</div><h3 style="margin:6px 0">Промокод</h3>'+
+  '<small>Введите промокод и получите награду.<br>Каждый промокод можно активировать только один раз.</small>'+
+  '<input class="pi" id="pc" type="text" placeholder="Введите промокод" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key===\'Enter\')activate()">'+
+  '<button class="g" style="width:100%" onclick="activate()">Активировать</button></div>';
+  if(used.length){
+    h+='<div class="box"><b>Активированные</b>';
+    used.forEach(k=>{h+='<div class="row"><span>🎟️ '+k+'</span><small>✅ использован</small></div>'});
+    h+='</div>';
+  }
+  return h;
+}
+function activate(){
+  const raw=($('pc').value||'').trim();
+  if(!raw){toast('Введите промокод',1);return}
+  const key=raw.toUpperCase(),p=PROMOS[key];
+  if(!p){toast('Неверный промокод',1);return}
+  if(S.promos[key]){toast('Промокод уже активирован',1);return}
+  if(p.gold)S.gold+=p.gold;
+  if(p.cont)for(const id in p.cont)S.cont[id]=gv(S.cont,id)+p.cont[id];
+  if(p.res)for(const k in p.res)S.res[k]=gv(S.res,k)+p.res[k];
+  if(p.tanks)p.tanks.forEach(n=>{S.tanks[n]=gv(S.tanks,n)+1});
+  S.promos[key]=1;save();render();
+  let h='<h3 style="margin-top:0">🎉 Промокод активирован!</h3><small>'+key+'</small><br><br>';
+  promoText(p).forEach(t=>{h+='<div class="row"><span>'+t+'</span></div>'});
+  h+='<br><button onclick="closeM()">Отлично</button>';
+  modal(h);
+}
+
+// ================= ИНВЕНТАРЬ =================
+function invPage(){
+  let h='<div class="sub"><button class="'+(sub==='cont'?'on':'')+'" onclick="sub=\'cont\';render()">📦 Контейнеры</button>'+
+  '<button class="'+(sub==='tank'?'on':'')+'" onclick="sub=\'tank\';render()">🪖 Танки</button></div>';
+  if(sub==='cont'){
+    CONTS.forEach(c=>{
+      const n=gv(S.cont,c.id),t=gv(S.tal,c.id),ce=gv(S.cert,c.id);
+      if(c.hidden&&n<1)return;
+      h+='<div class="box"><div class="big">'+c.ic+'</div><b>'+c.name+' ×'+n+'</b><br><br>'+
+      '<button '+(n<1?'disabled':'')+' onclick="openOne(\''+c.id+'\')">Открыть</button> '+
+      '<button class="g" '+(n<1?'disabled':'')+' onclick="openAll(\''+c.id+'\')">Открыть все</button> <button class="d" onclick="dropsModal(\''+c.id+'\')">Шансы</button>'+
+      (c.noTal?'':'<div class="sec">🗿 <b>'+c.tal+': '+t+'</b>'+
+      '<div class="bar"><i style="width:'+Math.min(100,t/NEED*100)+'%"></i></div>'+
+      '<small>'+(c.direct?NEED+' талисманов → танк '+c.direct:NEED+' талисманов → '+c.cert)+'</small><br><br>'+
+      '<button '+(t<NEED?'disabled':'')+' onclick="craft(\''+c.id+'\')">'+(c.direct?'Получить '+c.direct:'Объединить '+NEED)+'</button></div>');
+      if(!c.direct&&!c.noTal){
+        h+='<div class="sec">🏅 <b>'+c.cert+' ×'+ce+'</b><br><small>Выдаёт 1 танк из списка этого контейнера</small><br><br>'+
+        '<button class="g" '+(ce<1?'disabled':'')+' onclick="useCert(\''+c.id+'\')">Использовать</button></div>';
+      }
+      h+='</div>';
+    });
+    h+='<div class="box"><b>Склад</b>';
+    Object.keys(RESN).forEach(k=>{h+='<div class="row"><span>'+RESN[k][0]+' '+RESN[k][1]+'</span><b>'+fmt(gv(S.res,k))+'</b></div>'});
+    h+='</div>';
+  }else{
+    const list=Object.keys(S.tanks).filter(n=>S.tanks[n]>0).map(n=>TI(n)).filter(i=>i>=0).sort((a,b)=>TANKS[b][3]-TANKS[a][3]);
+    h+='<div class="mut" style="margin-bottom:8px">Уникальных: '+list.length+'/'+TANKS.length+'</div>';
+    if(!list.length)h+='<div class="box mut">Пока нет танков</div>';
+    h+='<div class="grid">';
+    list.forEach(i=>{
+      const t=TANKS[i];
+      h+='<div class="it" style="border-color:'+TCOL[t[3]]+'"><div style="font-size:30px">'+t[1]+'</div><b>'+t[0]+'</b><br>'+
+      '<small>'+ROM[t[3]]+' · '+CLS[t[2]]+'</small><br>×'+S.tanks[t[0]]+'<br>'+
+      '<button class="r" onclick="sell('+i+')">Продать '+fmt(PRICE[t[3]])+' 🪙</button></div>';
+    });
+    h+='</div>';
+  }
+  return h;
+}
+function sell(i){
+  const t=TANKS[i];
+  if(busy||!S.tanks[t[0]])return;
+  if(t[4]){
+    modal('<h3 style="margin-top:0">⚠️ Внимание</h3><div style="display:flex;justify-content:center">'+cardH({t:'tank',i:i})+'</div><br><p>Возможно данный танк вы больше никогда не получите, вы уверены что хотите его продать?</p><button class="r" onclick="doSell('+i+')">Да</button> <button class="g" onclick="closeM()">Нет</button>');
+    return;
+  }
+  doSell(i);
+}
+function doSell(i){
+  const t=TANKS[i];
+  if(busy||!S.tanks[t[0]])return;
+  S.tanks[t[0]]--;S.gold+=PRICE[t[3]];save();closeM();render();
+}
+function craft(id){
+  const c=CB(id);
+  if(gv(S.tal,id)<NEED)return;
+  S.tal[id]-=NEED;
+  if(c.direct){
+    const d={t:'tank',i:TI(c.direct)};
+    apply(d);save();render();
+    modal('<h3 style="margin-top:0">Танк получен!</h3><div style="display:flex;justify-content:center">'+cardH(d)+'</div><br><button onclick="closeM()">Отлично</button>');
+    return;
+  }
+  S.cert[id]=gv(S.cert,id)+1;save();render();toast('Получен '+c.cert+'!');
+}
+function useCert(id){
+  if(gv(S.cert,id)<1)return;
+  const c=CB(id);S.cert[id]--;
+  const d={t:'tank',i:TI(c.tanks[Math.floor(Math.random()*c.tanks.length)])};
+  apply(d);save();render();
+  modal('<h3 style="margin-top:0">'+c.cert+'</h3><div style="display:flex;justify-content:center">'+cardH(d)+'</div><br><button onclick="closeM()">Отлично</button>');
+}
+
+// ================= ОТКРЫТИЕ =================
+function openOne(id){
+  const c=CB(id);
+  if(busy||gv(S.cont,id)<1)return;
+  busy=true;S.cont[id]--;if(!c.noTal)S.tal[id]=gv(S.tal,id)+1;
+  const rewards=pickMany(c,rewardCount(c));
+  rewards.forEach(apply);save();render();
+  const win=rewards.slice().sort((a,b)=>a.w-b.w)[0];
+  const WIN=40,items=[];
+  for(let i=0;i<50;i++)items.push(c.drops[Math.floor(Math.random()*c.drops.length)]);
+  items[WIN]=win;
+  modal('<h3 style="margin-top:0">Открываем...</h3><div id="roll"><div id="strip">'+items.map(cardH).join('')+'</div></div><div id="rr"></div>');
+  setTimeout(()=>{
+    const st=$('strip'),cw=$('roll').clientWidth,cwid=102;
+    const tg=WIN*cwid+cwid/2-cw/2+(Math.random()*40-20);
+    st.style.transition='transform 5s cubic-bezier(.12,.7,.1,1)';
+    st.style.transform='translateX('+(-tg)+'px)';
+  },60);
+  setTimeout(()=>{
+    busy=false;
+    let h='<h3 style="margin:8px 0">Награды ('+rewards.length+')</h3>'+
+    (c.noTal?'':'<div class="row"><span>🗿 <b>'+c.tal+'</b><br><small>Гарантированно</small></span></div>')+
+    rewards.map(rowH).join('')+'<br><button onclick="closeM()">Забрать</button>';
+    if(gv(S.cont,id)>0)h+=' <button class="g" onclick="openOne(\''+id+'\')">Ещё раз</button>';
+    $('rr').innerHTML=h;
+    render();
+  },5300);
+}
+function openAll(id){
+  const c=CB(id),n=gv(S.cont,id);
+  if(busy||n<1)return;
+  S.cont[id]=0;if(!c.noTal)S.tal[id]=gv(S.tal,id)+n;
+  const got={};
+  for(let i=0;i<n;i++){
+    pickMany(c,rewardCount(c)).forEach(d=>{
+      apply(d);
+      const f=info(d),key=f.ic+' '+f.n;
+      got[key]=(got[key]||0)+1;
+    });
+  }
+  save();render();
+  let h='<h3 style="margin-top:0">Открыто: '+n+'</h3>'+(c.noTal?'':'<div class="row"><span>🗿 '+c.tal+'</span><b>×'+n+'</b></div>');
+  Object.keys(got).forEach(k=>{h+='<div class="row"><span>'+k+'</span><b>×'+got[k]+'</b></div>'});
+  h+='<br><button onclick="closeM()">Забрать</button>';
+  modal(h);
+}
+
+// ================= БОНУС =================
+$('bonus').onclick=()=>{
+  const left=S.bonus+BONUS_CD-Date.now();
+  if(left>0){toast('Бонус через '+Math.ceil(left/1000)+' сек.',1);return}
+  S.gold+=1500;S.bonus=Date.now();save();render();toast('+1500 🪙');
+};
+$('ov').onclick=e=>{if(e.target.id==='ov')closeM()};
+
+function render(){
+  $('gold').textContent=fmt(S.gold);
+  $('n-shop').className=page==='shop'?'on':'';
+  $('n-inv').className=page==='inv'?'on':'';
+  $('n-promo').className=page==='promo'?'on':'';
+  $('main').innerHTML=page==='shop'?shopPage():page==='inv'?invPage():promoPage();
+}
+render();
+</script>
+</body>
+</html>
