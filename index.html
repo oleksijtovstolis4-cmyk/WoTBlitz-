@@ -3,6 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
 <title>Танковые контейнеры</title>
 <style>
 *{box-sizing:border-box}
@@ -40,7 +42,7 @@ small,.mut{color:#8a93a6}
 .sec{border-top:1px solid #263047;margin-top:12px;padding-top:12px}
 input.pi{width:100%;padding:14px;font-size:17px;border-radius:10px;border:1px solid #2a3347;background:#10141c;color:#fff;text-align:center;margin:12px 0;outline:none}
 input.pi:focus{border-color:#3d7bff}
-#toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#2e9e5b;padding:10px 16px;border-radius:10px;z-index:20;display:none}
+#toast{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#2e9e5b;padding:10px 16px;border-radius:10px;z-index:20;display:none;max-width:90%;text-align:center}
 </style>
 </head>
 <body>
@@ -50,22 +52,34 @@ input.pi:focus{border-color:#3d7bff}
 </div>
 <div class="wrap" id="main"></div>
 <div class="nav">
-  <button id="n-shop" onclick="go('shop')">🛒 Магазин</button>
-  <button id="n-inv" onclick="go('inv')">🎒 Инвентарь</button>
-  <button id="n-promo" onclick="go('promo')">🎟️ Промокоды</button>
+  <button id="n-shop" data-a="go" data-v="shop">🛒 Магазин</button>
+  <button id="n-inv" data-a="go" data-v="inv">🎒 Инвентарь</button>
+  <button id="n-promo" data-a="go" data-v="promo">🎟️ Промокоды</button>
 </div>
 <div id="ov"><div id="mc"></div></div>
 <div id="toast"></div>
 
 <script>
+(function(){
+'use strict';
+// защита от встраивания в чужую страницу
+try{if(window.top!==window.self){document.body.textContent='';return}}catch(e){document.body.textContent='';return}
+
 const $=id=>document.getElementById(id);
 const ROM=['','','','','','V','VI','VII','VIII','IX','X'];
 const CLS={ТТ:'Тяжёлый',СТ:'Средний',ПТ:'ПТ-САУ'};
 const PRICE={10:7500,9:5000,8:3750,7:2500,6:1750,5:1250};
 const TCOL={10:'#ffb020',9:'#b05cff',8:'#3d9bff',7:'#4cc36a',5:'#9aa4b5'};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const at=(a,...v)=>' data-a="'+a+'" data-v="'+v.join('|')+'"';
+
+// ---------- хэш (для подписи сохранения и промокодов) ----------
+function H(s,seed){let h1=0xdeadbeef^seed,h2=0x41c6ce57^seed;for(let i=0,c;i<s.length;i++){c=s.charCodeAt(i);h1=Math.imul(h1^c,2654435761);h2=Math.imul(h2^c,1597334677)}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return(4294967296*(2097151&h2)+(h1>>>0)).toString(36)}
+const PH=c=>H('pm~'+c+'~tk',11)+H('tk~'+c+'~pm',29);
+const SG=d=>H('gc#'+d+'#'+d.length+'#xq',3)+H('qx#'+d.length+'#'+d+'#cg',17)+H(d.split('').reverse().join('')+'~v5',41);
 
 // ================= ТАНКИ =================
-// [название, флаг, класс, уровень]
+// [название, флаг, класс, уровень, (1 = редкий танк: при продаже предупреждение)]
 const TANKS=[
 ['Carro 45t','🇮🇹','СТ',10],['Lion','🇮🇹','СТ',10],['Strv K','🇸🇪','ТТ',10],
 ['Škoda T 27','🇨🇿','СТ',9],['Tornvagn','🇸🇪','ТТ',9],
@@ -81,11 +95,11 @@ const TANKS=[
 ['Об. 907','🇷🇺','СТ',10],['Об. 260','🇷🇺','ТТ',10],['Об. 777 II','🇷🇺','ТТ',10],
 ['Т-22 ср.','🇷🇺','СТ',10],['Объект 268/4','🇷🇺','ПТ',10],
 ['Ambassador','🇸🇪','СТ',9],
-// Хэллоуин (5-й элемент 1 = редкий танк, при продаже будет предупреждение)
 ['Жнец','🏴‍☠️','ПТ',8,1],['Кусака','🏴‍☠️','СТ',8,1],
 ['Хелсинг','🏴‍☠️','ПТ',7,1],['Франкенштанк','🇩🇪','ТТ',7,1],['Дракула','🏴‍☠️','СТ',7,1],
 ['Ликан','🏴‍☠️','ТТ',7,1],['Фараон','🏴‍☠️','ТТ',7,1],['Лесная ведьма','🏴‍☠️','ТТ',7,1],
-['Светоносец','🏴‍☠️','ТТ',7,1],['Кошмар','🏴‍☠️','ПТ',5,1],['Меджай','🏴‍☠️','ТТ',5,1]
+['Светоносец','🏴‍☠️','ТТ',7,1],['Кошмар','🏴‍☠️','ПТ',5,1],['Меджай','🏴‍☠️','ТТ',5,1],
+['M-VII-Yoh','🇺🇸','ТТ',7,1],['M-III-Yoh','🇺🇸','ТТ',8,1],['M-V-Yoh','🇺🇸','ТТ',9,1],['M-VI-Yoh','🇺🇸','ТТ',10,1]
 ];
 const TI=n=>TANKS.findIndex(t=>t[0]===n);
 
@@ -98,11 +112,11 @@ const RESN={
 };
 
 // ================= ПРОМОКОДЫ =================
-// Ключ пишется ЗАГЛАВНЫМИ буквами (регистр ввода не важен).
-// gold: золото | cont: {eu:3} контейнеры | res: {silver:200000} ресурсы | tanks:['Lion'] танки
+// Коды хранятся только в виде хэшей: прочитать их в исходнике нельзя.
 const PROMOS={
- 'TEST':{gold:100000},
- 'HAPPYHALLOWEEN2026':{cont:{hw:20}}
+ 'vh3bpu13vkcbv3jv8x4d':{gold:100000},
+ 'tifm6ksjo1th3yznsiqg':{cont:{hw:20}},
+ '1qe4ubyvnxh1cne36pecf4':{gold:1488,cont:{pr:2,eu:2,amb:8},tanks:['M-VII-Yoh','M-III-Yoh','M-V-Yoh','M-VI-Yoh']}
 };
 function promoText(p){
   const a=[];
@@ -114,8 +128,6 @@ function promoText(p){
 }
 
 // ================= КОНТЕЙНЕРЫ =================
-// res: key (склад), q (сколько), ic, n, w (вес), g (группа: из неё выпадает один вариант)
-// direct: 30 талисманов сразу дают этот танк
 const CONTS=[
 {
  id:'eu',name:'Европейский контейнер',ic:'🇪🇺📦',tal:'Талисман Европы',cert:'Сертификат Европы',
@@ -214,7 +226,7 @@ const CONTS=[
  ]
 }
 ];
-const NEED=30,BONUS_CD=60000;
+const NEED=30,BONUS_CD=60000,KEY='wb5';
 
 CONTS.forEach(c=>{
   c.drops=[];
@@ -224,26 +236,41 @@ CONTS.forEach(c=>{
 });
 const CB=id=>CONTS.find(c=>c.id===id);
 
-// ================= СОХРАНЕНИЕ =================
+// ================= СОХРАНЕНИЕ (с подписью) =================
+const fresh=()=>({gold:20000,cont:{},tal:{},cert:{},tanks:{},res:{},bonus:0,promos:{}});
+const isN=n=>typeof n==='number'&&isFinite(n)&&n>=0;
+function valid(s){
+  if(!s||typeof s!=='object')return false;
+  if(!isN(s.gold)||!isN(s.bonus))return false;
+  for(const k of ['cont','tal','cert','tanks','res','promos'])if(!s[k]||typeof s[k]!=='object')return false;
+  for(const k of ['cont','tal','cert','tanks','res'])for(const x in s[k])if(!isN(s[k][x]))return false;
+  return true;
+}
+let tampered=false;
 function load(){
-  let s=JSON.parse(localStorage.getItem('wb4')||'null');
-  if(s){s.promos=s.promos||{};return s}
-  s={gold:20000,cont:{},tal:{},cert:{},tanks:{},res:{},bonus:0,promos:{}};
-  const o=JSON.parse(localStorage.getItem('wb3')||'null');
-  if(o){
-    s.gold=o.gold;s.cont.eu=o.cont;s.tal.eu=o.tal;s.cert.eu=o.cert;s.tanks=o.tanks;s.bonus=o.bonus;
-    s.res={silver:o.silver,fxp:o.fxp,b_crew:o.boost.crew,b_cred:o.boost.cred,b_fxp:o.boost.fxp,b_btl:o.boost.btl};
-  }
-  return s;
+  try{localStorage.removeItem('wb3');localStorage.removeItem('wb4')}catch(e){}
+  let raw=null;
+  try{raw=localStorage.getItem(KEY)}catch(e){}
+  if(raw===null)return fresh();
+  try{
+    const r=JSON.parse(raw);
+    if(r&&typeof r.d==='string'&&r.h===SG(r.d)){
+      const s=JSON.parse(r.d);
+      if(valid(s))return s;
+    }
+  }catch(e){}
+  tampered=true;
+  return fresh();
 }
 let S=load();
-const save=()=>localStorage.setItem('wb4',JSON.stringify(S));
+function save(){
+  try{const d=JSON.stringify(S);localStorage.setItem(KEY,JSON.stringify({d:d,h:SG(d)}))}catch(e){}
+}
 let page='shop',sub='cont',busy=false;
 const fmt=n=>n.toLocaleString('ru-RU');
 const gv=(o,k)=>o[k]||0;
 
-function go(p){page=p;render()}
-function toast(t,bad){const e=$('toast');e.textContent=t;e.style.background=bad?'#c23b3b':'#2e9e5b';e.style.display='block';setTimeout(()=>e.style.display='none',1800)}
+function toast(t,bad){const e=$('toast');e.textContent=t;e.style.background=bad?'#c23b3b':'#2e9e5b';e.style.display='block';setTimeout(()=>{e.style.display='none'},bad&&t.length>40?4500:1800)}
 function modal(h){$('mc').innerHTML=h;$('ov').style.display='flex'}
 function closeM(){if(busy)return;$('ov').style.display='none'}
 
@@ -294,27 +321,38 @@ function cntText(c){
 function shopPage(){
   return CONTS.filter(c=>!c.hidden).map(c=>'<div class="box"><div class="big">'+c.ic+'</div><h3 style="margin:6px 0">'+c.name+'</h3>'+
   '<small>Гарантированно: '+c.tal+' ×1<br>+ '+cntText(c)+'<br>'+(c.direct?'30 талисманов = танк '+c.direct:'Танков в списке: '+c.tanks.length)+'</small><br><br>'+
-  '<button onclick="shopModal(\''+c.id+'\')">Выбрать · от '+fmt(c.packs[0][1])+' 🪙</button>'+
-  '<br><br><button class="d" onclick="dropsModal(\''+c.id+'\')">Содержимое и шансы</button></div>').join('');
+  '<button'+at('shopModal',c.id)+'>Выбрать · от '+fmt(c.packs[0][1])+' 🪙</button>'+
+  '<br><br><button class="d"'+at('dropsModal',c.id)+'>Содержимое и шансы</button></div>').join('');
 }
 function shopModal(id){
-  const c=CB(id),base=c.packs[0][1];
+  const c=CB(id);
+  if(!c||c.hidden)return;
+  const base=c.packs[0][1];
   let h='<h3 style="margin-top:0">'+c.name+'</h3>';
   c.packs.forEach(pk=>{
     const n=pk[0],p=pk[1];
     const sv=Math.round((1-p/(base*n))*100);
     h+='<div class="pack"><div><b>'+n+' шт.</b><br><small>'+(sv>0?'Выгода '+sv+'%':'Без скидки')+'</small></div>'+
-    '<button onclick="buy(\''+id+'\','+n+','+p+')">'+fmt(p)+' 🪙</button></div>';
+    '<button'+at('buy',id,n)+'>'+fmt(p)+' 🪙</button></div>';
   });
-  h+='<button class="d" onclick="closeM()">Закрыть</button>';
+  h+='<button class="d"'+at('closeM')+'>Закрыть</button>';
   modal(h);
 }
-function buy(id,n,p){
+// цена берётся ТОЛЬКО из внутренней таблицы, а не со страницы
+function buy(id,n){
+  const c=CB(id);
+  if(!c||c.hidden)return;
+  const pk=c.packs.find(x=>x[0]===n);
+  if(!pk)return;
+  const p=pk[1];
   if(S.gold<p){toast('Недостаточно золота',1);return}
   S.gold-=p;S.cont[id]=gv(S.cont,id)+n;save();closeM();render();toast('Куплено: '+n+' шт.');
 }
 function dropsModal(id){
-  const c=CB(id),ch=chances(c);
+  const c=CB(id);
+  if(!c)return;
+  if(c.hidden&&gv(S.cont,id)<1)return;
+  const ch=chances(c);
   const pc=d=>(ch[d.id]||0).toFixed(2)+'%';
   let h='<h3 style="margin-top:0">'+c.name+'</h3>'+
   '<small>В каждом контейнере: '+cntText(c)+' (без повторов). Шанс: что награда выпадет в контейнере.</small>'+
@@ -324,59 +362,62 @@ function dropsModal(id){
   c.drops.filter(d=>d.t!=='tank').forEach(d=>{
     h+='<div class="row"><span>'+d.ic+' '+d.n+'</span><b>'+pc(d)+'</b></div>'});
   h+=(c.noTal?'':'<div class="sec"><small>'+(c.direct?NEED+' талисманов → танк '+c.direct:NEED+' талисманов → '+c.cert+': 1 танк из списка, шанс каждого '+(100/c.tanks.length).toFixed(2)+'%')+'</small></div>')+
-  '<br><button class="d" onclick="closeM()">Закрыть</button>';
+  '<br><button class="d"'+at('closeM')+'>Закрыть</button>';
   modal(h);
 }
 
-// ================= ПРОМОКОДЫ (страница) =================
+// ================= ПРОМОКОДЫ =================
 function promoPage(){
   const used=Object.keys(S.promos);
   let h='<div class="box"><div class="big">🎟️</div><h3 style="margin:6px 0">Промокод</h3>'+
   '<small>Введите промокод и получите награду.<br>Каждый промокод можно активировать только один раз.</small>'+
-  '<input class="pi" id="pc" type="text" placeholder="Введите промокод" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key===\'Enter\')activate()">'+
-  '<button class="g" style="width:100%" onclick="activate()">Активировать</button></div>';
+  '<input class="pi" id="pc" type="text" placeholder="Введите промокод" autocomplete="off" autocapitalize="off" spellcheck="false">'+
+  '<button class="g" style="width:100%"'+at('activate')+'>Активировать</button></div>';
   if(used.length){
     h+='<div class="box"><b>Активированные</b>';
-    used.forEach(k=>{h+='<div class="row"><span>🎟️ '+k+'</span><small>✅ использован</small></div>'});
+    used.forEach(k=>{h+='<div class="row"><span>🎟️ '+esc(S.promos[k])+'</span><small>✅ использован</small></div>'});
     h+='</div>';
   }
   return h;
 }
 function activate(){
-  const raw=($('pc').value||'').trim();
+  const el=$('pc');
+  const raw=((el&&el.value)||'').trim();
   if(!raw){toast('Введите промокод',1);return}
-  const key=raw.toUpperCase(),p=PROMOS[key];
+  if(raw.length>64){toast('Неверный промокод',1);return}
+  const key=raw.normalize('NFC').toUpperCase(),hh=PH(key);
+  const p=Object.prototype.hasOwnProperty.call(PROMOS,hh)?PROMOS[hh]:null;
   if(!p){toast('Неверный промокод',1);return}
-  if(S.promos[key]){toast('Промокод уже активирован',1);return}
+  if(S.promos[hh]){toast('Промокод уже активирован',1);return}
   if(p.gold)S.gold+=p.gold;
   if(p.cont)for(const id in p.cont)S.cont[id]=gv(S.cont,id)+p.cont[id];
   if(p.res)for(const k in p.res)S.res[k]=gv(S.res,k)+p.res[k];
   if(p.tanks)p.tanks.forEach(n=>{S.tanks[n]=gv(S.tanks,n)+1});
-  S.promos[key]=1;save();render();
-  let h='<h3 style="margin-top:0">🎉 Промокод активирован!</h3><small>'+key+'</small><br><br>';
+  S.promos[hh]=key;save();render();
+  let h='<h3 style="margin-top:0">🎉 Промокод активирован!</h3><small>'+esc(key)+'</small><br><br>';
   promoText(p).forEach(t=>{h+='<div class="row"><span>'+t+'</span></div>'});
-  h+='<br><button onclick="closeM()">Отлично</button>';
+  h+='<br><button'+at('closeM')+'>Отлично</button>';
   modal(h);
 }
 
 // ================= ИНВЕНТАРЬ =================
 function invPage(){
-  let h='<div class="sub"><button class="'+(sub==='cont'?'on':'')+'" onclick="sub=\'cont\';render()">📦 Контейнеры</button>'+
-  '<button class="'+(sub==='tank'?'on':'')+'" onclick="sub=\'tank\';render()">🪖 Танки</button></div>';
+  let h='<div class="sub"><button class="'+(sub==='cont'?'on':'')+'"'+at('sub','cont')+'>📦 Контейнеры</button>'+
+  '<button class="'+(sub==='tank'?'on':'')+'"'+at('sub','tank')+'>🪖 Танки</button></div>';
   if(sub==='cont'){
     CONTS.forEach(c=>{
       const n=gv(S.cont,c.id),t=gv(S.tal,c.id),ce=gv(S.cert,c.id);
       if(c.hidden&&n<1)return;
       h+='<div class="box"><div class="big">'+c.ic+'</div><b>'+c.name+' ×'+n+'</b><br><br>'+
-      '<button '+(n<1?'disabled':'')+' onclick="openOne(\''+c.id+'\')">Открыть</button> '+
-      '<button class="g" '+(n<1?'disabled':'')+' onclick="openAll(\''+c.id+'\')">Открыть все</button> <button class="d" onclick="dropsModal(\''+c.id+'\')">Шансы</button>'+
+      '<button '+(n<1?'disabled':'')+at('openOne',c.id)+'>Открыть</button> '+
+      '<button class="g" '+(n<1?'disabled':'')+at('openAll',c.id)+'>Открыть все</button> <button class="d"'+at('dropsModal',c.id)+'>Шансы</button>'+
       (c.noTal?'':'<div class="sec">🗿 <b>'+c.tal+': '+t+'</b>'+
       '<div class="bar"><i style="width:'+Math.min(100,t/NEED*100)+'%"></i></div>'+
       '<small>'+(c.direct?NEED+' талисманов → танк '+c.direct:NEED+' талисманов → '+c.cert)+'</small><br><br>'+
-      '<button '+(t<NEED?'disabled':'')+' onclick="craft(\''+c.id+'\')">'+(c.direct?'Получить '+c.direct:'Объединить '+NEED)+'</button></div>');
+      '<button '+(t<NEED?'disabled':'')+at('craft',c.id)+'>'+(c.direct?'Получить '+c.direct:'Объединить '+NEED)+'</button></div>');
       if(!c.direct&&!c.noTal){
         h+='<div class="sec">🏅 <b>'+c.cert+' ×'+ce+'</b><br><small>Выдаёт 1 танк из списка этого контейнера</small><br><br>'+
-        '<button class="g" '+(ce<1?'disabled':'')+' onclick="useCert(\''+c.id+'\')">Использовать</button></div>';
+        '<button class="g" '+(ce<1?'disabled':'')+at('useCert',c.id)+'>Использовать</button></div>';
       }
       h+='</div>';
     });
@@ -392,50 +433,55 @@ function invPage(){
       const t=TANKS[i];
       h+='<div class="it" style="border-color:'+TCOL[t[3]]+'"><div style="font-size:30px">'+t[1]+'</div><b>'+t[0]+'</b><br>'+
       '<small>'+ROM[t[3]]+' · '+CLS[t[2]]+'</small><br>×'+S.tanks[t[0]]+'<br>'+
-      '<button class="r" onclick="sell('+i+')">Продать '+fmt(PRICE[t[3]])+' 🪙</button></div>';
+      '<button class="r"'+at('sell',i)+'>Продать '+fmt(PRICE[t[3]])+' 🪙</button></div>';
     });
     h+='</div>';
   }
   return h;
 }
 function sell(i){
+  if(!Number.isInteger(i)||!TANKS[i])return;
   const t=TANKS[i];
   if(busy||!S.tanks[t[0]])return;
   if(t[4]){
-    modal('<h3 style="margin-top:0">⚠️ Внимание</h3><div style="display:flex;justify-content:center">'+cardH({t:'tank',i:i})+'</div><br><p>Возможно данный танк вы больше никогда не получите, вы уверены что хотите его продать?</p><button class="r" onclick="doSell('+i+')">Да</button> <button class="g" onclick="closeM()">Нет</button>');
+    modal('<h3 style="margin-top:0">⚠️ Внимание</h3><div style="display:flex;justify-content:center">'+cardH({t:'tank',i:i})+'</div><br><p>Возможно данный танк вы больше никогда не получите, вы уверены что хотите его продать?</p><button class="r"'+at('doSell',i)+'>Да</button> <button class="g"'+at('closeM')+'>Нет</button>');
     return;
   }
   doSell(i);
 }
 function doSell(i){
+  if(!Number.isInteger(i)||!TANKS[i])return;
   const t=TANKS[i];
   if(busy||!S.tanks[t[0]])return;
   S.tanks[t[0]]--;S.gold+=PRICE[t[3]];save();closeM();render();
 }
 function craft(id){
   const c=CB(id);
+  if(!c||c.noTal)return;
   if(gv(S.tal,id)<NEED)return;
   S.tal[id]-=NEED;
   if(c.direct){
     const d={t:'tank',i:TI(c.direct)};
     apply(d);save();render();
-    modal('<h3 style="margin-top:0">Танк получен!</h3><div style="display:flex;justify-content:center">'+cardH(d)+'</div><br><button onclick="closeM()">Отлично</button>');
+    modal('<h3 style="margin-top:0">Танк получен!</h3><div style="display:flex;justify-content:center">'+cardH(d)+'</div><br><button'+at('closeM')+'>Отлично</button>');
     return;
   }
   S.cert[id]=gv(S.cert,id)+1;save();render();toast('Получен '+c.cert+'!');
 }
 function useCert(id){
+  const c=CB(id);
+  if(!c||c.direct||c.noTal)return;
   if(gv(S.cert,id)<1)return;
-  const c=CB(id);S.cert[id]--;
+  S.cert[id]--;
   const d={t:'tank',i:TI(c.tanks[Math.floor(Math.random()*c.tanks.length)])};
   apply(d);save();render();
-  modal('<h3 style="margin-top:0">'+c.cert+'</h3><div style="display:flex;justify-content:center">'+cardH(d)+'</div><br><button onclick="closeM()">Отлично</button>');
+  modal('<h3 style="margin-top:0">'+c.cert+'</h3><div style="display:flex;justify-content:center">'+cardH(d)+'</div><br><button'+at('closeM')+'>Отлично</button>');
 }
 
 // ================= ОТКРЫТИЕ =================
 function openOne(id){
   const c=CB(id);
-  if(busy||gv(S.cont,id)<1)return;
+  if(!c||busy||gv(S.cont,id)<1)return;
   busy=true;S.cont[id]--;if(!c.noTal)S.tal[id]=gv(S.tal,id)+1;
   const rewards=pickMany(c,rewardCount(c));
   rewards.forEach(apply);save();render();
@@ -454,15 +500,15 @@ function openOne(id){
     busy=false;
     let h='<h3 style="margin:8px 0">Награды ('+rewards.length+')</h3>'+
     (c.noTal?'':'<div class="row"><span>🗿 <b>'+c.tal+'</b><br><small>Гарантированно</small></span></div>')+
-    rewards.map(rowH).join('')+'<br><button onclick="closeM()">Забрать</button>';
-    if(gv(S.cont,id)>0)h+=' <button class="g" onclick="openOne(\''+id+'\')">Ещё раз</button>';
+    rewards.map(rowH).join('')+'<br><button'+at('closeM')+'>Забрать</button>';
+    if(gv(S.cont,id)>0)h+=' <button class="g"'+at('openOne',id)+'>Ещё раз</button>';
     $('rr').innerHTML=h;
     render();
   },5300);
 }
 function openAll(id){
-  const c=CB(id),n=gv(S.cont,id);
-  if(busy||n<1)return;
+  const c=CB(id),n=c?gv(S.cont,id):0;
+  if(!c||busy||n<1)return;
   S.cont[id]=0;if(!c.noTal)S.tal[id]=gv(S.tal,id)+n;
   const got={};
   for(let i=0;i<n;i++){
@@ -475,17 +521,42 @@ function openAll(id){
   save();render();
   let h='<h3 style="margin-top:0">Открыто: '+n+'</h3>'+(c.noTal?'':'<div class="row"><span>🗿 '+c.tal+'</span><b>×'+n+'</b></div>');
   Object.keys(got).forEach(k=>{h+='<div class="row"><span>'+k+'</span><b>×'+got[k]+'</b></div>'});
-  h+='<br><button onclick="closeM()">Забрать</button>';
+  h+='<br><button'+at('closeM')+'>Забрать</button>';
   modal(h);
 }
 
-// ================= БОНУС =================
-$('bonus').onclick=()=>{
+// ================= ПЕРЕКЛЮЧЕНИЕ СТРАНИЦ И СОБЫТИЯ =================
+const ACT={
+  go:v=>{page=v[0]==='inv'?'inv':(v[0]==='promo'?'promo':'shop');render()},
+  sub:v=>{sub=v[0]==='tank'?'tank':'cont';render()},
+  shopModal:v=>shopModal(v[0]),
+  dropsModal:v=>dropsModal(v[0]),
+  buy:v=>buy(v[0],parseInt(v[1],10)),
+  closeM:()=>closeM(),
+  activate:()=>activate(),
+  openOne:v=>openOne(v[0]),
+  openAll:v=>openAll(v[0]),
+  craft:v=>craft(v[0]),
+  useCert:v=>useCert(v[0]),
+  sell:v=>sell(parseInt(v[0],10)),
+  doSell:v=>doSell(parseInt(v[0],10))
+};
+document.addEventListener('click',e=>{
+  const t=e.target;
+  if(t&&t.id==='ov'){closeM();return}
+  const el=t&&t.closest?t.closest('[data-a]'):null;
+  if(!el||el.disabled)return;
+  const a=el.getAttribute('data-a');
+  if(Object.prototype.hasOwnProperty.call(ACT,a))ACT[a]((el.getAttribute('data-v')||'').split('|'));
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target&&e.target.id==='pc')activate();
+});
+$('bonus').addEventListener('click',()=>{
   const left=S.bonus+BONUS_CD-Date.now();
   if(left>0){toast('Бонус через '+Math.ceil(left/1000)+' сек.',1);return}
   S.gold+=1500;S.bonus=Date.now();save();render();toast('+1500 🪙');
-};
-$('ov').onclick=e=>{if(e.target.id==='ov')closeM()};
+});
 
 function render(){
   $('gold').textContent=fmt(S.gold);
@@ -495,6 +566,8 @@ function render(){
   $('main').innerHTML=page==='shop'?shopPage():page==='inv'?invPage():promoPage();
 }
 render();
+if(tampered){save();toast('Обнаружено изменение сохранения. Прогресс сброшен.',1)}
+})();
 </script>
 </body>
 </html>
